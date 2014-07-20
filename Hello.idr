@@ -20,9 +20,22 @@ data Vect : Type -> Nat -> Type where
     Null : Vect a O
     Con : a -> Vect a n -> Vect a ( S n )
 
+
 ( ++ ) : { A : Type } -> Vect A n -> Vect A m -> Vect A ( plus n m )
 ( ++ ) Null ys = ys
 ( ++ ) ( Con x xs ) ys = Con x (   xs ++  ys )
+
+repeat : { A : Type } -> ( n : Nat ) -> A -> Vect A n
+repeat O _ = Null
+repeat ( S n ) x = Con x ( repeat n x )
+
+vzipWith :  { A, B, C : Type } ->  ( A -> B -> C ) -> Vect A n -> Vect B n -> Vect C n
+vzipWith f Null Null = Null
+vzipWith f ( Con x xs ) ( Con y ys ) =  Con ( f x y ) ( vzipWith f xs ys )
+
+Matrix : { A : Type } -> { m , n : Nat } -> Type -> Nat -> Nat -> Type
+Matrix A n m = Vect ( Vect A m ) n
+
 
 
 reverse : List a -> List a
@@ -45,7 +58,7 @@ even ( S n ) = odd n where
     odd O = False
     odd ( S n ) = even n
 
-{-
+
+
 main : IO ()
 main = putStrLn "Hello dependent type world!"
--}
