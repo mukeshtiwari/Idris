@@ -18,21 +18,5 @@ public
 matrixMult :  ( Num a ) => Vect m ( Vect n a ) -> Vect n ( Vect p a ) -> Vect m ( Vect p a )
 matrixMult xs ys = matMult xs ( transposeMat ys )
 
-plus_nO : ( n : Nat ) -> n + Z = n 
-plus_nO Z = refl
-plus_nO ( S k ) = let ih = plus_nO k in ?plus_Scase
-
-
-
-
-
----------- Proofs ----------
-
-Main.plus_Scase = proof
-  compute
-  intros 
-  rewrite ih
-  rewrite ih
-  trivial
 
 
