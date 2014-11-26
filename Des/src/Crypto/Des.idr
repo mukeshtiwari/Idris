@@ -21,17 +21,32 @@ finalPerm = [39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30,
              35, 3, 43, 11, 51, 19, 59, 27, 34, 2, 42, 10, 50, 18, 58, 26,
              33, 1, 41,  9, 49, 17, 57, 25, 32, 0, 40 , 8, 48, 16, 56, 24]
 
+computePerm : { n : Nat } -> { m : Nat } -> ( input : Vect n Bin ) 
+              -> ( perm : Vect m Nat ) -> Sigma Nat ( \p => Vect p Bin )
+computePerm { m } { n } input perm =  
+ let 
+     MkSigma p ys  =  catMaybes . map ( \i => natToFin i n ) $ perm
+ in  MkSigma p ( map ( \i =>  Prelude.Vect.index i input ) ys )
+ 
 
-computePermutation : ( input : Vect 64 Bin )  -> ( perm : Vect 64 Nat ) ->  Vect 64 Bin
-computePermutation input perm = 
+computePermutation : ( input : Vect 64 Bin )  -> ( perm : Vect 64 Nat ) 
+                     ->  Vect 64 Bin
+computePermutation  input perm =  
+ let 
+    MkSigma  ( cast { from = Integer } { to = Prelude.Nat.Nat } 64 ) ys 
+       = computePerm input perm
+ in ys 
+ 
+{-
  let
-   MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 64 )  ys = 
-     catMaybes .  map ( \i => natToFin i 64 ) $ perm
+    MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 64 )  ys = 
+      catMaybes .  map ( \i => natToFin i 64 ) $ perm
  in  map ( \i =>  Prelude.Vect.index i input ) ys
-
+ -}
 
 firstStep : Vect 64 Bin -> ( Vect 32 Bin , Vect 32 Bin )
 firstStep  = splitAt 32
+
 
 expansionPerm : Vect 48 Nat
 expansionPerm = [31,  0,  1,  2,  3,  4,  3,  4,  5,  6,  7,  8,
@@ -40,28 +55,34 @@ expansionPerm = [31,  0,  1,  2,  3,  4,  3,  4,  5,  6,  7,  8,
                  23, 24, 25, 26, 27, 28, 27, 28, 29, 30, 31,  0]
 
 
-expandRightInput : ( input : Vect 32 Bin ) -> ( perm : Vect 48 Nat ) -> Vect 48 Bin
+expandRightInput : ( input : Vect 32 Bin ) -> ( perm : Vect 48 Nat ) 
+                   -> Vect 48 Bin
 expandRightInput input perm = 
   let
      MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 48 ) ys = 
-       catMaybes .  map ( \i => natToFin i 32 ) $ perm
-  in map ( \i =>  Prelude.Vect.index i input ) ys
+        computePerm  input perm 
+        --catMaybes .  map ( \i => natToFin i 32 ) $ perm
+  in ys --map ( \i =>  Prelude.Vect.index i input ) ys
 
 
-
-roundXor : ( input : Vect n Bin ) -> ( key : Vect n Bin ) -> Vect n Bin
+roundXor : ( input : Vect n Bin ) -> ( key : Vect n Bin ) 
+           -> Vect n Bin
 roundXor input key = zipWith xorBin input key
 
 
-inputToSB : { n : Nat } -> Vect n Bin -> Sigma Nat ( \p => Vect p ( Vect 6 Bin ))
+inputToSB : { n : Nat } -> Vect n Bin 
+            -> Sigma Nat ( \p => Vect p ( Vect 6 Bin ))
 inputToSB { n = Z } _  = MkSigma 0 Nil
-inputToSB { n = ( S ( S ( S ( S ( S ( S n ) ) ) ) ) ) } ( a :: b :: c :: d :: e :: f :: rest ) with ( inputToSB { n } rest )
+inputToSB { n = ( S ( S ( S ( S ( S ( S n ) ) ) ) ) ) } 
+          ( a :: b :: c :: d :: e :: f :: rest ) with ( inputToSB { n } rest )
   | MkSigma 0 rest' = MkSigma 1 ( [ a , b , c , d , e , f ] :: rest' )
-  | MkSigma k rest' = MkSigma ( S k ) ( [ a , b , c , d , e , f ] :: rest' )
+  | MkSigma k rest' = MkSigma ( S k  ) ( [ a , b , c , d , e , f ] :: rest' )
+
 
 
 inputToSBox : Vect 48 Bin -> Sigma Nat ( \p => Vect p ( Vect 6 Bin ) )
 inputToSBox = inputToSB
+
 
 bintoNat : Bin -> Nat
 bintoNat Zero = Z
@@ -84,7 +105,8 @@ nattoBin n with ( modNat n 2 , nattoBin ( divNat n 2) )
 
 
 
-outfromSBox : Vect 6 Bin -> ( sbox : Vect 4 ( Vect 16 Nat ) ) -> Vect 4 Bin
+outfromSBox : Vect 6 Bin -> ( sbox : Vect 4 ( Vect 16 Nat ) ) 
+              -> Vect 4 Bin
 outfromSBox xs sbox = 
   let 
      ( row , col ) = rowCol xs
@@ -147,13 +169,13 @@ sBoxEight = [[13,  2,  8,  4,  6, 15, 11,  1, 10,  9,  3, 14,  5,  0, 12,  7],
              [7,  11,  4,  1,  9, 12, 14,  2,  0,  6, 10, 13, 15,  3,  5,  8],
              [2,   1, 14,  7,  4, 10,  8, 13, 15, 12,  9,  0,  3,  5,  6, 11]]
 
-computesDBoxPermutation : ( input : Vect 32 Bin )  -> ( dperm : Vect 32 Nat ) 
-                                                   ->  Vect 32 Bin
-computesDBoxPermutation input dperm =
+computesDBoxPermutation : ( input : Vect 32 Bin )  -> ( perm : Vect 32 Nat ) 
+                          ->  Vect 32 Bin
+computesDBoxPermutation input perm =
    let
      MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 32 )  ys =
-       catMaybes .  map ( \i => natToFin i 32 ) $ dperm
-   in  map ( \i =>  Prelude.Vect.index i input ) ys
+      computePerm input perm
+   in ys --map ( \i =>  Prelude.Vect.index i input ) ys
 
 sDBox : Vect 32 Nat
 sDBox = [15, 6, 19, 20, 28, 11, 27, 16,  0, 14, 22, 25,  4, 17, 30,  9,
@@ -163,12 +185,12 @@ sDBox = [15, 6, 19, 20, 28, 11, 27, 16,  0, 14, 22, 25,  4, 17, 30,  9,
 {- Start encryption -}
 
 oneRoundEnc : ( Vect 32 Bin , Vect 32 Bin ) -> ( roundKey : Vect 48 Bin ) 
-                                        ->  ( Vect 32 Bin , Vect 32 Bin )
+              ->  ( Vect 32 Bin , Vect 32 Bin )
 oneRoundEnc ( xs , ys ) roundKey = 
   let 
       MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 8 ) xs'  
-            = inputToSBox ( roundXor 
-                          ( expandRightInput ys expansionPerm ) roundKey )
+            = inputToSBox . roundXor 
+                          ( expandRightInput ys expansionPerm ) $ roundKey
       xs''  = roundXor ( computesDBoxPermutation 
                        ( concat ( zipWith outfromSBox xs'  
                                 [ sBoxOne , sBoxTwo , sBoxThree, sBoxFour , 
@@ -178,15 +200,41 @@ oneRoundEnc ( xs , ys ) roundKey =
   in ( ys , xs'' )
   
 
+{- Key generation -}
+
+paritydropkeytable : Vect 56 Nat
+paritydropkeytable = [56, 48, 40, 32, 24, 16,  8,  0, 57, 49, 41, 33, 25, 17,
+                       9,  1, 58, 50, 42, 34, 26, 18, 10,  2, 59, 51, 43, 35,
+                      62, 54, 46, 38, 30, 22, 14,  6, 61, 53, 45, 37, 29, 21,
+                      13,  5, 60, 52, 44, 36, 28, 20, 12,  4, 27, 19, 11,  3]
+
+
+keycompression : Vect 48 Nat
+keycompression = [13, 16, 10, 23,  0,  4,  2, 27, 14,  5, 20,  9,
+                  22, 18, 11,  3, 25,  7, 15,  6, 26, 19, 12,  1,
+                  40, 51, 30, 36, 46, 54, 29, 39, 50, 44, 32, 47,
+                  43, 48, 38, 55, 33, 52, 45, 41, 49, 35, 28, 31]
+
+dropParity : ( key : Vect 64 Bin ) -> ( keytable : Vect 56 Nat ) 
+             -> Vect 56 Bin
+dropParity key keytable = 
+   let
+        MkSigma ( cast { from = Integer } { to = Prelude.Nat.Nat } 56 )  ys =
+          computePerm key keytable 
+          --catMaybes .  map ( \i => natToFin i 64 ) $ keytable
+   in  ys --map ( \i =>  Prelude.Vect.index i key ) ys
+
+
+
+{-
+generateRoundkey : ( key : Vect 64 Bin ) -> Vect 16 ( Vect 48 Bin )
+generateRoundkey key =
+  let 
+      key' = dropParity key paritydropkeytable
 
 
 
 
-
-
-
-
-
-
+-}
 
 
