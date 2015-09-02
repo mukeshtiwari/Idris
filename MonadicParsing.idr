@@ -1,72 +1,11 @@
 module MonadicParsing
 
-{-
-data Parser a = P (List Char -> List (a, List Char))
-
-
-item : Parser Char
-item = P (\cs => case cs of
-   [] => []
-   (c :: cs) => [(c, cs)])
-
-
-
-
-Parser : Type -> Type
-Parser a = List Char -> List (a, List Char)
-
-result : a -> Parser a
-result v = \inp => [(v, inp)]
-
-zero : Parser a
-zero = \inp => []
-
-item : Parser Char
-item = \inp => case inp of
-   [] => []
-   (c :: cs) => [(c, cs)]
-
-doParse : Parser a -> List Char -> List (a, List Char)
-doParse f xs = f xs
-
-seq : Parser a -> Parser b -> Parser (a, b)
-seq p q = \inp => [((u, v), inp'') | (u, inp') <- p inp,
-                                     (v, inp'') <- q inp]
-bind : Parser a -> (a -> Parser b) -> Parser b
-bind p f = \inp => concat [f v inp' | (v, inp') <- p inp]
-
-sat : (Char -> Bool) -> Parser Char
-sat p = bind item (\x =>
-          if p x then result x else zero)
-
-char : Char -> Parser Char
-char c = sat (\y => y == c)
-
-digit : Parser Char
-digit = sat (\x => '0' <= x && x <= '9')
-
-lower : Parser Char
-lower = sat (\x => 'a' <= x && x <= 'z')
-
-upper : Parser Char
-upper = sat (\x => 'A' <= x && x <= 'Z')
-
-plus : Parser a -> Parser a -> Parser a
-plus p q = \inp => (p inp ++ q inp)
-
-letter : Parser Char
-letter = plus lower upper
-
-alphanum : Parser Char
-alphanum = plus letter digit
-
--}
-
 data Parser : Type -> Type where
   MkParser : (String -> List (a, String)) -> Parser a
 
 parse : Parser a -> (String -> List (a, String))
 parse (MkParser f) = f
+
 
 instance Functor Parser where
   map f p = MkParser (\inp => [(f v, out) | (v, out) <- parse p inp])
@@ -77,9 +16,10 @@ instance Applicative Parser where
   a <*> b = MkParser
     (\inp => [(f v, out) | (f, rest) <- parse a inp, (v, out) <- parse b rest])
 
+
 instance Monad Parser where
   f >>= g = MkParser
-    (\inp => [ (u, out) | (x, rest) <- parse f inp, (u, out) <- parse (g x) rest])
+    (\inp => [(u, out) | (x, rest) <- parse f inp, (u, out) <- parse (g x) rest])
 
 instance Alternative Parser where
   empty = MkParser (\inp => [])
@@ -95,11 +35,53 @@ item = MkParser
          (c :: cs) => [(c, pack cs)])
 
 
+sat : (Char -> Bool) -> Parser Char
+sat f = item >>= \x => if f x then return x else empty
+
+digit : Parser Char
+digit = sat isDigit
+
+lower : Parser Char
+lower = sat isLower
+
+upper : Parser Char
+upper = sat isUpper
+
+letter : Parser Char
+letter = sat isAlpha
+
+alphanum : Parser Char
+alphanum =  sat isAlphaNum
+
+char : Char -> Parser Char
+char x = sat ( == x)
+
+string : String -> Parser String
+string x = string' (unpack x) where
+       string' : List Char -> Parser String
+       string' [] = return ""  -- MkParser (\inp => [("", inp)])
+       string' (y :: ys) =
+         char y >>= \_ =>  string' ys >>= \_ =>  return (pack (y :: ys))
+
+
+mutual
+  partial
+  many : Parser a -> Parser (List a)
+  many p = manyOne p <|> empty
+
+  partial
+  manyOne : Parser a -> Parser (List a)
+  manyOne p = p >>= \v => many p >>= \vs => return (v :: vs)
+
+
+
+
 
 
 {-
 instance Applicative Parser where
-  pure v = MkParser (\inp => [(v, inp)])
+
+    pure v = MkParser (\inp => [(v, inp)])
   a <*> b = MkParser (\inp =>
                          do
                            (f, rest) <- parse a inp
